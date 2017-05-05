@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 
 import java.io.File;
@@ -29,7 +28,7 @@ public class FileController {
     private static Logger logger = LoggerFactory.getLogger(FileController.class);
     private Path upload_files = Paths.get("upload_files");
 
-    @GetMapping(path="/read/{filename}",name = "read")
+    @GetMapping(path = "/read/{filename}", name = "read")
     public ResponseEntity<?> getFile(@PathVariable("filename") String filename) {
         Path filePath = upload_files.resolve(filename);
         File file = filePath.toFile();
@@ -44,18 +43,23 @@ public class FileController {
 
     @PostMapping("/upload")
     public Callable<ResponseEntity<?>> uploadFile(@RequestParam MultipartFile file) throws Exception {
-        String fileName = file.getOriginalFilename();
-        Path target = upload_files.resolve(fileName);
-        logger.info("target >>>>>> " + target.toAbsolutePath());
-        InputStream inputStream = null;
-        try {
-            inputStream = file.getInputStream();
-            Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
-            URI fileUri = URI.create(MvcUriComponentsBuilder.fromMappingName("read").build()+fileName);
+        logger.info("web container thread >>>> " + Thread.currentThread().toString());
+
+        return () -> {
+            logger.info("upload thread >>>>>> " + Thread.currentThread().toString());
+            String fileName = file.getOriginalFilename();
+            InputStream inputStream = null;
+            try {
+                Path target = upload_files.resolve(fileName);
+                logger.info("target >>>>>> " + target.toAbsolutePath());
+                inputStream = file.getInputStream();
+                Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
+            } finally {
+                IOUtils.closeQuietly(inputStream);
+            }
+            URI fileUri = URI.create(MvcUriComponentsBuilder.fromMappingName("read").build() + fileName);
             logger.info("fileUri >>>>" + fileUri);
-            return () -> ResponseEntity.created(fileUri).contentType(MediaType.TEXT_PLAIN).body("Create Successful");
-        } finally {
-            IOUtils.closeQuietly(inputStream);
-        }
+            return ResponseEntity.created(fileUri).contentType(MediaType.TEXT_PLAIN).body("Create Successful");
+        };
     }
 }
