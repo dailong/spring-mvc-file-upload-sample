@@ -41,11 +41,12 @@ public class FileController {
         }
     }
 
-    @PostMapping("/upload")
+    @PostMapping("/upload") //async
     public Callable<ResponseEntity<?>> uploadFile(@RequestParam MultipartFile file) throws Exception {
+        // run in web container thread pool
         logger.info("web container thread >>>> " + Thread.currentThread().toString());
 
-        return () -> {
+        return () -> {  //run in async thread pool
             logger.info("upload thread >>>>>> " + Thread.currentThread().toString());
             String fileName = file.getOriginalFilename();
             InputStream inputStream = null;
